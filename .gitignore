@@ -1,2 +1,17 @@
-venv
-backend\.env
+# Python virtual environment
+venv/
+backend/venv/
+
+# Environment variables
+backend/.env
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# OS / Editor files
+.vscode/
+.idea/
+.DS_Store
