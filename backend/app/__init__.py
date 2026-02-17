@@ -10,6 +10,7 @@ from app.routes.auth import auth_bp
 from app.routes.test import test_bp
 from app.routes.api_keys import api_keys_bp
 from app.routes.upload import upload_bp
+from app.routes.predict import predict_bp
 
 
 
@@ -51,6 +52,7 @@ def create_app():
     app.register_blueprint(test_bp, url_prefix="/api/test")
     app.register_blueprint(api_keys_bp, url_prefix="/api/api-keys")
     app.register_blueprint(upload_bp, url_prefix="/api/upload")
+    app.register_blueprint(predict_bp, url_prefix="/api/predict")
 
     return app
 

@@ -24,6 +24,7 @@ upload_bp = Blueprint("upload", __name__)
 @jwt_required()
 @require_roles("ADMIN", "ANALYST")
 def upload_csv():
+    # ---------- Basic file checks ----------
     if "file" not in request.files:
         return jsonify({"error": "CSV file missing"}), 400
 
@@ -35,7 +36,7 @@ def upload_csv():
     if not file.filename.lower().endswith(".csv"):
         return jsonify({"error": "Only CSV files are allowed"}), 400
 
-    # Mapping & churn definition
+    # ---------- Mapping & churn definition ----------
     mapping_json = request.form.get("mapping")
     churn_def_json = request.form.get("churn_definition")
 
@@ -48,12 +49,13 @@ def upload_csv():
     except json.JSONDecodeError:
         return jsonify({"error": "Invalid mapping or churn definition JSON"}), 400
 
+    # ---------- Auth context ----------
     claims = get_jwt()
     company_id = uuid.UUID(claims["company_id"])
 
     filename = secure_filename(file.filename)
 
-    # Save upload record
+    # ---------- Save upload record ----------
     upload = Upload(
         company_id=company_id,
         filename=filename,
@@ -63,16 +65,17 @@ def upload_csv():
     db.session.commit()
 
     try:
+        # ---------- Read CSV ----------
         stream = io.StringIO(file.stream.read().decode("utf-8"))
         df = pd.read_csv(stream)
 
         if df.empty:
             return jsonify({"error": "CSV is empty"}), 400
 
-        # Apply column mapping
+        # ---------- Apply column mapping ----------
         df = df.rename(columns=mapping)
 
-        # Validate required fields
+        # ---------- Validate required fields ----------
         missing = [f for f in REQUIRED_FIELDS if f not in df.columns]
         if missing:
             return jsonify({
@@ -80,10 +83,22 @@ def upload_csv():
                 "missing_fields": missing
             }), 400
 
-        # UPSERT customers + normalize churn
+        # ---------- UPSERT customers + normalize churn ----------
         for _, row in df.iterrows():
             row_dict = row.to_dict()
 
+            # 🔥 sanitize values for JSON storage
+            for k, v in row_dict.items():
+                if pd.isna(v):
+                    row_dict[k] = None
+                elif isinstance(v, pd.Timestamp):
+                    row_dict[k] = v.isoformat()
+
+            # ---------- Validate customer_id ----------
+            if "customer_id" not in row_dict or not row_dict["customer_id"]:
+                raise Exception("customer_id missing after mapping")
+
+            # ---------- Normalize churn ----------
             churn_value = normalize_churn(row_dict, churn_definition)
             if churn_value is not None:
                 row_dict["churn"] = churn_value
@@ -105,10 +120,10 @@ def upload_csv():
                 )
                 db.session.add(customer)
 
-        # Save mapping for reuse
+        # ---------- Save mapping for reuse ----------
         column_mapping = ColumnMapping(
             company_id=company_id,
-            feature_mapping=mapping,
+            mapping=mapping,
             churn_definition=churn_definition
         )
         db.session.add(column_mapping)

@@ -12,6 +12,6 @@ class ColumnMapping(UUIDMixin, db.Model):
     )
 
     mapping = db.Column(db.JSON, nullable=False)
-    # example: { "cust_id": "customer_id", "months_active": "tenure" }
+    churn_definition = db.Column(db.JSON, nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
